@@ -5,6 +5,17 @@
 
 
 
+#define STEPDIRECTIONLR                   4  // dir pin stepstick
+#define STEPPINLR                         3  // step pin stepstick
+
+#define STEPDIRECTIONUD                   12  // dir pin stepstick
+#define STEPPINUD                         11  // step pin stepstick
+
+
+
+
+
+
 //#define ONBOARDLED                      4  // wemos pin onboard led
 bool triggered = false;
 
@@ -77,8 +88,10 @@ void setup() {
     
     
     //pinMode(ONBOARDLED, OUTPUT);
-    pinMode(STEPDIRECTION, OUTPUT);
-    pinMode(STEPPIN, OUTPUT);
+    pinMode(STEPDIRECTIONUD, OUTPUT);
+    pinMode(STEPPINUD, OUTPUT);
+    pinMode(STEPDIRECTIONLR, OUTPUT);
+    pinMode(STEPPINLR, OUTPUT);
     pinMode(BTNPIN, INPUT);
 
 
@@ -88,8 +101,13 @@ void setup() {
   //attachInterrupt(digitalPinToInterrupt(interruptPin), stop, CHANGE);
   
     //digitalWrite(ONBOARDLED, HIGH);
-    digitalWrite(STEPDIRECTION, HIGH);
-    digitalWrite(STEPPIN, HIGH);
+    digitalWrite(STEPDIRECTIONLR, HIGH);
+    digitalWrite(STEPPINLR, HIGH);
+    digitalWrite(STEPDIRECTIONUD, HIGH);
+    digitalWrite(STEPPINUD, HIGH);
+
+
+    
 
     attachInterrupt(digitalPinToInterrupt(interruptPin), stop, FALLING );
     
@@ -114,8 +132,12 @@ void loop() {
       centerLR  = (measureLeft/2) + offset;
       currentPositionLR = centerLR;
       
-      move(centerLR, chopSplit, chopDelay, 1);
-      currentPositionUD = 500;
+      moveLR(centerLR, chopSplit, chopDelay, 1);
+      currentPositionUD = 50;
+
+      moveUD(currentPositionUD, chopSplit, chopDelay, 1);
+
+      
       calibrated = true;
       
 
@@ -129,68 +151,71 @@ void loop() {
       int diffLR = currentPositionLR - mapLR;    
 
 
-//      int avgUD = averageLastUD(currentReadUD);
-//      int mapUD = map(avgUD, 0, 1024, 906, 0);
-//      int diffUD = currentPositionUD - mapUD;    
+      int avgUD = averageLastUD(currentReadUD);
+      int mapUD = map(avgUD, 0, 1024, 500, 0);
+      int diffUD = currentPositionUD - mapUD;    
 
        
-      
-      Serial.print(" currentPositionLR: ");
-      Serial.print(currentPositionLR);
+//      
+//      Serial.print(" currentPositionLR: ");
+//      Serial.print(currentPositionLR);
+//
+//      Serial.print(" currentReadLR: ");
+//      Serial.print(currentReadLR);
+//      
+//      Serial.print(" currentReadUD: ");
+//      Serial.print(currentReadUD);
+//
+//      Serial.print(" avgLR: ");
+//      Serial.print(avgLR);
+//      
+//      Serial.print(" mapLR: ");
+//      Serial.print(mapLR);
+//
+//      Serial.print(" diffLR: ");
+//      Serial.print(diffLR);
+//      
+//      Serial.print(" diffUD: ");
+//      Serial.print(diffUD);
 
-      Serial.print(" currentReadLR: ");
-      Serial.print(currentReadLR);
-      
-      Serial.print(" currentReadUD: ");
-      Serial.print(currentReadUD);
-
-      Serial.print(" avgLR: ");
-      Serial.print(avgLR);
-      
-      Serial.print(" mapLR: ");
-      Serial.print(mapLR);
-
-      Serial.print(" diffLR: ");
-      Serial.print(diffLR);
-      
-      Serial.print(" lastAvg: ");
-      Serial.print(lastAvgLR);
-
-      Serial.print(" cng: ");
-      Serial.print(avgLR - lastAvgLR);
-
-      
+    
       int mvAmountLR = 0;
       int mvAmountUD = 0;
       
-      int minChng = 50;
+      int minChngLR = 50;
+      int minChngUD = 30;
+
+      
       int chopDelayPan = 1500;//200
       int chopSplitPan = 1500;//150
       
       if(calibrated){
-        if(diffLR > 0 && abs(diffLR)>minChng){
-          mvAmountLR = move(diffLR, chopSplitPan, chopDelayPan, 1);
+        // left right movement
+        if(diffLR > 0 && abs(diffLR)>minChngLR){
+          mvAmountLR = moveLR(diffLR, chopSplitPan, chopDelayPan, 1);
           currentPositionLR = currentPositionLR - mvAmountLR;
-        }else if(diffLR < 0 && abs(diffLR)>minChng){
-          mvAmountLR = move(abs(diffLR), chopSplitPan, chopDelayPan, 0);        
+        }else if(diffLR < 0 && abs(diffLR)>minChngLR){
+          mvAmountLR = moveLR(abs(diffLR), chopSplitPan, chopDelayPan, 0);        
           currentPositionLR = currentPositionLR + mvAmountLR;
         }
 
-//        if(diffUD > 0 && abs(diffUD)>minChng){
-//          mvAmountLR = move(diffUD, chopSplitPan, chopDelayPan, 1);
-//          currentPositionUD = currentPositionUD - mvAmountUD;
-//        }else if(diffUD < 0 && abs(diffUD)>minChng){
-//          mvAmountUD = move(abs(diffUD), chopSplitPan, chopDelayPan, 0);        
-//          currentPositionUD = currentPositionUD + mvAmountUD;
-//        }
-
-        
+        // updown stepper movement
+        if(diffUD > 0 && abs(diffUD)>minChngUD){
+          Serial.print("MOVE UD-----------------------------------");        
+          mvAmountUD = moveUD(diffUD, chopSplitPan, chopDelayPan, 1);
+          currentPositionUD = currentPositionUD - mvAmountUD;
+        }else if(diffUD < 0 && abs(diffUD)>minChngUD){
+          Serial.print("MOVE UD------------------------------------");    
+          mvAmountUD = moveUD(abs(diffUD), chopSplitPan, chopDelayPan, 0);        
+          currentPositionUD = currentPositionUD + mvAmountUD;
+        }
       }
 
       Serial.print(" newCurrentLR: ");
-      Serial.println(currentPositionLR);
+      Serial.print(currentPositionLR);
+      Serial.print(" newCurrentUD: ");
+      Serial.println(currentPositionUD);
 
-      lastAvgLR = avgLR;
 
     }
 }
@@ -329,7 +354,41 @@ int move(int times, int flash_delay, int off_delay, int dir){
   return index;
 }
 
+int moveUD(int times, int flash_delay, int off_delay, int dir){
+  int index = 0;
+  if(dir){
+    digitalWrite(STEPDIRECTIONUD, HIGH);
+  }else{
+    digitalWrite(STEPDIRECTIONUD, LOW);
+  }
+  
+  while(index<times){
+    digitalWrite(STEPPINUD, LOW);
+    delayMicroseconds(flash_delay);
+    digitalWrite(STEPPINUD, HIGH);
+    delayMicroseconds(off_delay);
+    index = index + 1;
+  }
+  return index;
+}
 
+int moveLR(int times, int flash_delay, int off_delay, int dir){
+  int index = 0;
+  if(dir){
+    digitalWrite(STEPDIRECTIONLR, HIGH);
+  }else{
+    digitalWrite(STEPDIRECTIONLR, LOW);
+  }
+  
+  while(index<times){
+    digitalWrite(STEPPINLR, LOW);
+    delayMicroseconds(flash_delay);
+    digitalWrite(STEPPINLR, HIGH);
+    delayMicroseconds(off_delay);
+    index = index + 1;
+  }
+  return index;
+}
 
 
 // 3240, 200, 200
