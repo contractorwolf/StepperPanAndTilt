@@ -354,6 +354,10 @@ int move(int times, int flash_delay, int off_delay, int dir){
   return index;
 }
 
+
+
+// need to combine moveUD and moveLR into a single method that looks at the difference between the current position and suggested position for each 
+// stepper and moves in the suggested direction to achieve that position on each iteration in order to not waste and cycles
 int moveUD(int times, int flash_delay, int off_delay, int dir){
   int index = 0;
   if(dir){
