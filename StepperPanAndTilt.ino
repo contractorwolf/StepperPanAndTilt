@@ -1,38 +1,23 @@
-
-#define STEPDIRECTION                   4  // dir pin stepstick
-#define STEPPIN                         3  // step pin stepstick
-#define BTNPIN                         2  // step pin stepstick
-
-
-
+#define BTNPIN                            8  // step pin stepstick
 #define STEPDIRECTIONLR                   4  // dir pin stepstick
 #define STEPPINLR                         3  // step pin stepstick
-
 #define STEPDIRECTIONUD                   12  // dir pin stepstick
 #define STEPPINUD                         11  // step pin stepstick
 
+const byte interruptPinLR = 7;
+const byte interruptPinUD = 2;
 
 
+const int analogPinLR = A0; // potentiometer wiper (middle terminal) connected to analog pin 0
+const int analogPinUD = A1; // potentiometer wiper (middle terminal) connected to analog pin 0
 
-
-
-//#define ONBOARDLED                      4  // wemos pin onboard led
-bool triggered = false;
-
+volatile bool stopStateLR = false;
+volatile bool stopStateUD = false;
+volatile byte state = LOW;
 
 int buttonStatus = 0;
-
-volatile byte stopState = false;
-const byte interruptPin = 7;
-
-int analogPinLR = A0; // potentiometer wiper (middle terminal) connected to analog pin 0
-int analogPinUD = A1; // potentiometer wiper (middle terminal) connected to analog pin 0
-
 int lastRead = 0;  // variable to store the value read
 
-
-
-volatile byte state = LOW;
 
 int fullSpin = 1600;// 1600 is 360 exactly
 int chopDelay = 400;//200
@@ -69,47 +54,47 @@ int last11UD = 0;
 
 int currentPositionLR = 0;
 int currentPositionUD = 0;
+
 volatile int measureLeft = 0;
 volatile int measureRight = 0;
 
+volatile int measureUp = 0;
+volatile int measureDown = 0;
+
+
+
 byte calibrated = false;
-
-
 byte leftRight = false;
 
 int lastAvgLR = 0;
 int lastAvgUD = 0;
 
 static unsigned long last;
+
 void setup() {
   // put your setup code here, to run once:
 
     Serial.println("STARTING");
-    
-    
-    //pinMode(ONBOARDLED, OUTPUT);
+
+    //pin setup
     pinMode(STEPDIRECTIONUD, OUTPUT);
     pinMode(STEPPINUD, OUTPUT);
     pinMode(STEPDIRECTIONLR, OUTPUT);
     pinMode(STEPPINLR, OUTPUT);
     pinMode(BTNPIN, INPUT);
 
-
+    pinMode(interruptPinLR, INPUT_PULLUP);
+    pinMode(interruptPinUD, INPUT_PULLUP);
     
-
-  pinMode(interruptPin, INPUT_PULLUP);
-  //attachInterrupt(digitalPinToInterrupt(interruptPin), stop, CHANGE);
-  
-    //digitalWrite(ONBOARDLED, HIGH);
+    
+    //pin initialize
     digitalWrite(STEPDIRECTIONLR, HIGH);
     digitalWrite(STEPPINLR, HIGH);
     digitalWrite(STEPDIRECTIONUD, HIGH);
     digitalWrite(STEPPINUD, HIGH);
 
-
-    
-
-    attachInterrupt(digitalPinToInterrupt(interruptPin), stop, FALLING );
+    attachInterrupt(digitalPinToInterrupt(interruptPinLR), stopLR, FALLING );
+    attachInterrupt(digitalPinToInterrupt(interruptPinUD), stopUD, FALLING );
     
 }
 
@@ -117,31 +102,41 @@ void loop() {
     buttonStatus = digitalRead(BTNPIN);
 
     if(buttonStatus){
-
-      
-      stopState = false;
       Serial.println("button pressed");
-      measureRight = measure(fullSpin, chopSplit, chopDelay, 1);
-      move(5, chopSplit, chopDelay, 0);
+
+      //measure LR side to side 
+      stopStateLR = false;      
+      measureRight = measureLR(fullSpin, 1, STEPDIRECTIONLR, STEPPINLR);
+      moveLR(5, chopSplit, chopDelay, 0);
+      
       delay(10);   
-      stopState = false;
-      measureLeft = measure(fullSpin, chopSplit, chopDelay, 0);
+      stopStateLR = false;
+      measureLeft = measureLR(fullSpin, 0, STEPDIRECTIONLR, STEPPINLR);
+      
       delay(10); 
-      stopState = false;
 
       centerLR  = (measureLeft/2) + offset;
-      currentPositionLR = centerLR;
-      
+      stopStateLR = false;
       moveLR(centerLR, chopSplit, chopDelay, 1);
-      currentPositionUD = 50;
+      currentPositionLR = centerLR;
 
-      moveUD(currentPositionUD, chopSplit, chopDelay, 1);
-
+      //measure UD top to bottom
+      stopStateUD = false;      
+      measureUp = measureUD(fullSpin, 1, STEPDIRECTIONUD, STEPPINUD);
+      moveUD(5, chopSplit, chopDelay, 0);
       
+      delay(10);   
+      stopStateUD = false;
+      measureDown = measureUD(fullSpin, 0, STEPDIRECTIONUD, STEPPINUD);
+      
+      delay(10); 
+
+      centerUD  = (measureDown/2) + 0; //offset
+      stopStateUD = false;
+      moveUD(centerUD, chopSplit, chopDelay, 1);
+      currentPositionUD = centerUD;
+
       calibrated = true;
-      
-
-      //leftRight = !leftRight;
     }else{
       int currentReadLR = analogRead(analogPinLR);
       int currentReadUD = analogRead(analogPinUD);
@@ -220,10 +215,92 @@ void loop() {
     }
 }
 
-void stop(){
-  stopState = true;
-  Serial.println("stop");
+void stopLR(){
+  stopStateLR = true;
+  Serial.println("stop LR");
 }
+void stopUD(){
+  stopStateUD = true;
+  Serial.println("stop UD");
+}
+
+int measureLR(int times, int dir, int dirPin, int stepPin){
+  int index = 0;
+
+  if(dir){
+    digitalWrite(dirPin, HIGH);
+  }else{
+    digitalWrite(dirPin, LOW);
+  }
+  
+  while(index<times && stopStateLR == false){
+    digitalWrite(stepPin, LOW);
+    delayMicroseconds(chopSplit);
+    digitalWrite(stepPin, HIGH);
+    delayMicroseconds(chopDelay);
+    index = index + 1;
+  }
+  return index;
+}
+
+int measureUD(int times, int dir, int dirPin, int stepPin){
+  int index = 0;
+
+  if(dir){
+    digitalWrite(dirPin, HIGH);
+  }else{
+    digitalWrite(dirPin, LOW);
+  }
+  
+  while(index<times && stopStateUD == false){
+    digitalWrite(stepPin, LOW);
+    delayMicroseconds(chopSplit);
+    digitalWrite(stepPin, HIGH);
+    delayMicroseconds(chopDelay);
+    index = index + 1;
+  }
+  return index;
+}
+
+// need to combine moveUD and moveLR into a single method that looks at the difference between the current position and suggested position for each 
+// stepper and moves in the suggested direction to achieve that position on each iteration in order to not waste and cycles
+int moveUD(int times, int flash_delay, int off_delay, int dir){
+  int index = 0;
+  if(dir){
+    digitalWrite(STEPDIRECTIONUD, HIGH);
+  }else{
+    digitalWrite(STEPDIRECTIONUD, LOW);
+  }
+  
+  while(index<times){
+    digitalWrite(STEPPINUD, LOW);
+    delayMicroseconds(flash_delay);
+    digitalWrite(STEPPINUD, HIGH);
+    delayMicroseconds(off_delay);
+    index = index + 1;
+  }
+  return index;
+}
+
+int moveLR(int times, int flash_delay, int off_delay, int dir){
+  int index = 0;
+  if(dir){
+    digitalWrite(STEPDIRECTIONLR, HIGH);
+  }else{
+    digitalWrite(STEPDIRECTIONLR, LOW);
+  }
+  
+  while(index<times){
+    digitalWrite(STEPPINLR, LOW);
+    delayMicroseconds(flash_delay);
+    digitalWrite(STEPPINLR, HIGH);
+    delayMicroseconds(off_delay);
+    index = index + 1;
+  }
+  return index;
+}
+
+
 
 
 int averageLastLR(int incoming){
@@ -288,7 +365,7 @@ int averageLastUD(int incoming){
 
 void flash_leds(int times, int flash_delay){
   int index = 0;
-  while(index<times && stopState == false){
+  while(index<times){
     digitalWrite(LED_BUILTIN, LOW);
     delay(flash_delay);
     digitalWrite(LED_BUILTIN, HIGH);
@@ -298,144 +375,3 @@ void flash_leds(int times, int flash_delay){
 }
 
 
-
-
-
-void simple_wave(int times, int flash_delay, int off_delay){
-  int index = 0;
-  while(index<times && stopState == false){
-    digitalWrite(STEPPIN, LOW);
-    delayMicroseconds(flash_delay);
-    digitalWrite(STEPPIN, HIGH);
-    delayMicroseconds(off_delay);
-    index = index + 1;
-  }
-}
-
-
-
-int measure(int times, int flash_delay, int off_delay, int dir){
-  int index = 0;
-
-
-  if(dir){
-    digitalWrite(STEPDIRECTION, HIGH);
-  }else{
-    digitalWrite(STEPDIRECTION, LOW);
-  }
-  
-  while(index<times && stopState == false){
-
-      digitalWrite(STEPPIN, LOW);
-      delayMicroseconds(flash_delay);
-      digitalWrite(STEPPIN, HIGH);
-      delayMicroseconds(off_delay);
-
-    index = index + 1;
-  }
-  return index;
-}
-
-int move(int times, int flash_delay, int off_delay, int dir){
-  int index = 0;
-  if(dir){
-    digitalWrite(STEPDIRECTION, HIGH);
-  }else{
-    digitalWrite(STEPDIRECTION, LOW);
-  }
-  
-  while(index<times){
-    digitalWrite(STEPPIN, LOW);
-    delayMicroseconds(flash_delay);
-    digitalWrite(STEPPIN, HIGH);
-    delayMicroseconds(off_delay);
-    index = index + 1;
-  }
-  return index;
-}
-
-
-
-// need to combine moveUD and moveLR into a single method that looks at the difference between the current position and suggested position for each 
-// stepper and moves in the suggested direction to achieve that position on each iteration in order to not waste and cycles
-int moveUD(int times, int flash_delay, int off_delay, int dir){
-  int index = 0;
-  if(dir){
-    digitalWrite(STEPDIRECTIONUD, HIGH);
-  }else{
-    digitalWrite(STEPDIRECTIONUD, LOW);
-  }
-  
-  while(index<times){
-    digitalWrite(STEPPINUD, LOW);
-    delayMicroseconds(flash_delay);
-    digitalWrite(STEPPINUD, HIGH);
-    delayMicroseconds(off_delay);
-    index = index + 1;
-  }
-  return index;
-}
-
-int moveLR(int times, int flash_delay, int off_delay, int dir){
-  int index = 0;
-  if(dir){
-    digitalWrite(STEPDIRECTIONLR, HIGH);
-  }else{
-    digitalWrite(STEPDIRECTIONLR, LOW);
-  }
-  
-  while(index<times){
-    digitalWrite(STEPPINLR, LOW);
-    delayMicroseconds(flash_delay);
-    digitalWrite(STEPPINLR, HIGH);
-    delayMicroseconds(off_delay);
-    index = index + 1;
-  }
-  return index;
-}
-
-
-// 3240, 200, 200
-//(1/(3240/4))+1
-void step_wave(int times, int flash_delay, int off_delay){
-  int index = 0;
-  int quad = 1;
-  int on_t;
-
-  // min: 200--800
-  while(index<times && stopState == false){
-    quad = (index/(times/10)) + 1;
-
-    if(quad==1){
-        on_t = flash_delay * 3;
-    }else if(quad==2){
-        on_t = flash_delay * 2;
-    }else if(quad==3){
-        on_t = flash_delay;
-    }else if(quad==4){
-        on_t = flash_delay;
-    }else if(quad==5){
-        on_t = flash_delay;
-    }else if(quad==6){
-        on_t = flash_delay;
-    }else if(quad==7){
-        on_t = flash_delay;
-    }else if(quad==8){
-        on_t = flash_delay;
-    }else if(quad==9){
-        on_t = flash_delay;
-    }else if(quad==10){
-        on_t = flash_delay * 2;
-    }
-
-    digitalWrite(STEPPIN, LOW);
-    delayMicroseconds(on_t);
-    digitalWrite(STEPPIN, HIGH);
-    delayMicroseconds(on_t);
-    
-    index = index + 1;
-    
-    yield();
-
-  }
-}
