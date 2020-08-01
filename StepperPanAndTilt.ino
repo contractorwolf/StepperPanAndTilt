@@ -4,8 +4,8 @@
 #define STEPDIRECTIONUD                   12  // dir pin stepstick
 #define STEPPINUD                         11  // step pin stepstick
 
-const byte interruptPinLR = 7;
-const byte interruptPinUD = 2;
+const byte interruptPinLR = 7;//green
+const byte interruptPinUD = 2;//red
 
 
 const int analogPinLR = A0; // potentiometer wiper (middle terminal) connected to analog pin 0
@@ -120,12 +120,12 @@ void loop() {
       int currentReadUD = analogRead(analogPinUD);
       
       int avgLR = averageLastLR(currentReadLR);
-      int mapLR = map(avgLR, 0, 1024, 850, 150);
+      int mapLR = map(avgLR, 0, 1024, 900, 30);
       int diffLR = currentPositionLR - mapLR;    
 
 
       int avgUD = averageLastUD(currentReadUD);
-      int mapUD = map(avgUD, 0, 1024, 350, 30);
+      int mapUD = map(avgUD, 0, 1024, 500, 30);
       int diffUD = currentPositionUD - mapUD;    
 
       int mvAmountLR = 0;
@@ -187,36 +187,26 @@ void calibrateLR(){
   //measure LR side to side 
   stopStateLR = false;      
   measureRight = measureLR(fullSpin, 1, STEPDIRECTIONLR, STEPPINLR);
-  moveLR(5, 0);
-  
-  delay(10);   
-  stopStateLR = false;
-  measureLeft = measureLR(fullSpin, 0, STEPDIRECTIONLR, STEPPINLR);
-  
-  delay(10); 
-  
-  centerLR  = (measureLeft/2) + offset;
-  stopStateLR = false;
-  moveLR(centerLR, 1);
-  currentPositionLR = centerLR;
+//  moveLR(5, 0);
+//  
+//  delay(10);   
+//  stopStateLR = false;
+//  measureLeft = measureLR(fullSpin, 0, STEPDIRECTIONLR, STEPPINLR);
+//  
+//  delay(10); 
+//  
+//  centerLR  = (measureLeft/2) + offset;
+//  stopStateLR = false;
+//  moveLR(centerLR, 1);
+//  currentPositionLR = centerLR;
+ currentPositionLR = 0;
+  currentPositionLR = 0;
 }
 
 void calibrateUD(){
-    //measure UD top to bottom
-  stopStateUD = false;      
-  measureUp = measureUD(fullSpin, 1, STEPDIRECTIONUD, STEPPINUD);
-  moveUD(5, 0);
-  
-  delay(10);   
   stopStateUD = false;
-  measureDown = measureUD(fullSpin, 0, STEPDIRECTIONUD, STEPPINUD);
-  
-  delay(10); 
-  
-  centerUD  = (measureDown/2) + 0; //offset
-  stopStateUD = false;
-  moveUD(centerUD, 1);
-  currentPositionUD = centerUD;
+  measureDown = measureUD(fullSpin, 1, STEPDIRECTIONUD, STEPPINUD);
+  currentPositionUD = 0;
 }
 
 
