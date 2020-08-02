@@ -1,11 +1,11 @@
-#define BTNPIN                            8  // step pin stepstick
-#define STEPDIRECTIONLR                   4  // dir pin stepstick
-#define STEPPINLR                         3  // step pin stepstick
-#define STEPDIRECTIONUD                   12  // dir pin stepstick
-#define STEPPINUD                         11  // step pin stepstick
+#define BTNPIN                            4  // btn pin 4
+#define STEPDIRECTIONLR                   5  // lr dir pin stepstick 5
+#define STEPPINLR                         6  // lr step pin stepstick 6
+#define STEPDIRECTIONUD                   11 // ud dir pin stepstick 11
+#define STEPPINUD                         12 // ud step pin stepstick 12
 
-const byte interruptPinLR = 7;//green
-const byte interruptPinUD = 2;//red
+const byte interruptPinUD = 2;//red ud 2
+const byte interruptPinLR = 3;//green lr 3
 
 
 const int analogPinLR = A0; // potentiometer wiper (middle terminal) connected to analog pin 0
@@ -13,12 +13,10 @@ const int analogPinUD = A1; // potentiometer wiper (middle terminal) connected t
 
 volatile bool stopStateLR = false;
 volatile bool stopStateUD = false;
-volatile byte state = LOW;
+
 
 int buttonStatus = 0;
 int lastRead = 0;  // variable to store the value read
-
-
 int fullSpin = 1600;// 1600 is 360 exactly
 
 
@@ -70,12 +68,10 @@ byte leftRight = false;
 int lastAvgLR = 0;
 int lastAvgUD = 0;
 
-int chopDelayPan = 1500;//200
-int chopSplitPan = 1500;//150
+int chopDelayPan = 1200;//200
+int chopSplitPan = 1200;//150
 int chopDelay = 400;//200
 int chopSplit = 400;//150
-
-
 
 static unsigned long last;
 
@@ -94,91 +90,77 @@ void setup() {
     pinMode(interruptPinLR, INPUT_PULLUP);
     pinMode(interruptPinUD, INPUT_PULLUP);
     
-    
     //pin initialize
     digitalWrite(STEPDIRECTIONLR, HIGH);
     digitalWrite(STEPPINLR, HIGH);
     digitalWrite(STEPDIRECTIONUD, HIGH);
     digitalWrite(STEPPINUD, HIGH);
 
-    attachInterrupt(digitalPinToInterrupt(interruptPinLR), stopLR, FALLING );
-    attachInterrupt(digitalPinToInterrupt(interruptPinUD), stopUD, FALLING );
-    
+    attachInterrupt(digitalPinToInterrupt(interruptPinLR), stopLR, FALLING);
+    attachInterrupt(digitalPinToInterrupt(interruptPinUD), stopUD, FALLING);
 }
 
 void loop() {
-    buttonStatus = digitalRead(BTNPIN);
+  buttonStatus = digitalRead(BTNPIN);
 
-    if(buttonStatus){
-      Serial.println("button pressed");
-      calibrated = false;
-
-      calibrated = calibrate();
-
-    }else{
-      int currentReadLR = analogRead(analogPinLR);
-      int currentReadUD = analogRead(analogPinUD);
-      
-      int avgLR = averageLastLR(currentReadLR);
-      int mapLR = map(avgLR, 0, 1024, 900, 30);
-      int diffLR = currentPositionLR - mapLR;    
+  if(buttonStatus){
+    Serial.println("button pressed");
+    calibrated = false;
+    calibrated = calibrate();
+  }else{
+    int currentReadLR = analogRead(analogPinLR);
+    int currentReadUD = analogRead(analogPinUD);
+    
+    int avgLR = averageLastLR(currentReadLR);
+    int mapLR = map(avgLR, 0, 1024, 900, 30);
+    int diffLR = currentPositionLR - mapLR;    
 
 
-      int avgUD = averageLastUD(currentReadUD);
-      int mapUD = map(avgUD, 0, 1024, 500, 30);
-      int diffUD = currentPositionUD - mapUD;    
+    int avgUD = averageLastUD(currentReadUD);
+    int mapUD = map(avgUD, 0, 1024, 400, 10);
+    int diffUD = currentPositionUD - mapUD;    
 
-      int mvAmountLR = 0;
-      int mvAmountUD = 0;
-      
-      int minChngLR = 50;
-      int minChngUD = 30;
+    int mvAmountLR = 0;
+    int mvAmountUD = 0;
+    
+    int minChngLR = 50;
+    int minChngUD = 30;
 
-      if(calibrated){
-        // left right movement
-        if(diffLR > 0 && abs(diffLR)>minChngLR){
-          mvAmountLR = moveLR(diffLR, 1);
-          currentPositionLR = currentPositionLR - mvAmountLR;
-          Serial.print(" newCurrentLR: ");      
-          Serial.println(currentPositionLR);
-        }else if(diffLR < 0 && abs(diffLR)>minChngLR){
-          mvAmountLR = moveLR(abs(diffLR), 0);        
-          currentPositionLR = currentPositionLR + mvAmountLR;
-          Serial.print(" newCurrentLR: ");      
-          Serial.println(currentPositionLR);
-        }
-
-        // updown stepper movement
-        if(diffUD > 0 && abs(diffUD)>minChngUD){
-          //Serial.print("MOVE UD-----------------------------------");      
-          mvAmountUD = moveUD(diffUD, 1);
-          currentPositionUD = currentPositionUD - mvAmountUD;
-          Serial.print(" newCurrentUD: ");      
-          Serial.println(currentPositionUD);
-        }else if(diffUD < 0 && abs(diffUD)>minChngUD){
-          //Serial.print("MOVE UD------------------------------------");    
-          mvAmountUD = moveUD(abs(diffUD), 0);        
-          currentPositionUD = currentPositionUD + mvAmountUD;
-          Serial.print(" newCurrentUD: ");      
-          Serial.println(currentPositionUD);
-        }
+    if(calibrated){
+      // left right movement
+      if(diffLR > 0 && abs(diffLR)>minChngLR){
+        mvAmountLR = moveLR(diffLR, 1);
+        currentPositionLR = currentPositionLR - mvAmountLR;
+        Serial.print(" newCurrentLR: ");      
+        Serial.println(currentPositionLR);
+      }else if(diffLR < 0 && abs(diffLR)>minChngLR){
+        mvAmountLR = moveLR(abs(diffLR), 0);        
+        currentPositionLR = currentPositionLR + mvAmountLR;
+        Serial.print(" newCurrentLR: ");      
+        Serial.println(currentPositionLR);
       }
-//
-//      Serial.print(" newCurrentLR: ");
-//      Serial.print(currentPositionLR);
-//      Serial.print(" newCurrentUD: ");      
-//      Serial.println(currentPositionUD);
 
-
+      // updown stepper movement
+      if(diffUD > 0 && abs(diffUD)>minChngUD){
+        //Serial.print("MOVE UD-----------------------------------");      
+        mvAmountUD = moveUD(diffUD, 1);
+        currentPositionUD = currentPositionUD - mvAmountUD;
+        Serial.print(" newCurrentUD: ");      
+        Serial.println(currentPositionUD);
+      }else if(diffUD < 0 && abs(diffUD)>minChngUD){
+        //Serial.print("MOVE UD------------------------------------");    
+        mvAmountUD = moveUD(abs(diffUD), 0);        
+        currentPositionUD = currentPositionUD + mvAmountUD;
+        Serial.print(" newCurrentUD: ");      
+        Serial.println(currentPositionUD);
+      }
     }
+  }
 }
 
 bool calibrate(){
-
   calibrateLR();
-  
   calibrateUD();
-  
   return true;
 }
 
@@ -187,78 +169,30 @@ void calibrateLR(){
   //measure LR side to side 
   stopStateLR = false;      
   measureRight = measureLR(fullSpin, 1, STEPDIRECTIONLR, STEPPINLR);
-//  moveLR(5, 0);
-//  
-//  delay(10);   
-//  stopStateLR = false;
-//  measureLeft = measureLR(fullSpin, 0, STEPDIRECTIONLR, STEPPINLR);
-//  
-//  delay(10); 
-//  
-//  centerLR  = (measureLeft/2) + offset;
-//  stopStateLR = false;
-//  moveLR(centerLR, 1);
-//  currentPositionLR = centerLR;
- currentPositionLR = 0;
+  moveLR(10, 0);
   currentPositionLR = 0;
 }
 
 void calibrateUD(){
   stopStateUD = false;
   measureDown = measureUD(fullSpin, 1, STEPDIRECTIONUD, STEPPINUD);
+  moveUD(10, 0);
   currentPositionUD = 0;
 }
 
-
-
 void stopLR(){
   stopStateLR = true;
-
-  // look at current direction L or R
-  // if L then set current position to max left
-  // if R then set current poistion to max right 
-  
   Serial.println("stop LR");
 }
+
 void stopUD(){
   stopStateUD = true;
-
   Serial.println("stop UD");
-  Serial.print("directionUD: ");
-  Serial.print(directionUD);
-  Serial.print(" currentPositionUD");
-  Serial.println(currentPositionUD);
-
-  
-
-//// 1 is down, 0 is up
-//  if(directionUD == 1){
-//    moveUD(5, 1);
-//    currentPositionUD = 0;
-//  }else if(directionUD == 0){
-//    moveUD(5, 0);
-//    currentPositionUD = 500;
-//  }
-//
-
-
-//  Serial.print(" new currentPositionUD");
-//  Serial.println(currentPositionUD);
-//
-//  // look at current direction U or D
-//  // if U then set current position to max up
-//  // if D then set current poistion to max down 
-//  Serial.println("stop UD");
 }
 
 int measureLR(int times, int dir, int dirPin, int stepPin){
   int index = 0;
-
-//  Serial.print("direction: ");// 1 is right, 0 is left
-//  Serial.println(dir);
-
   directionLR = dir;
-  
   if(dir){
     digitalWrite(dirPin, HIGH);
   }else{
@@ -277,14 +211,7 @@ int measureLR(int times, int dir, int dirPin, int stepPin){
 
 int measureUD(int times, int dir, int dirPin, int stepPin){
   int index = 0;
-
-//  
-//  Serial.print("direction: ");// 1 is down, 0 is up
-//  Serial.println(dir);
-
   directionUD = dir;
-
-
   if(dir){
     digitalWrite(dirPin, HIGH);
   }else{
@@ -373,7 +300,6 @@ int averageLastLR(int incoming){
   return (last6LR +last5LR +last4LR +last3LR +last2LR + last1LR +last7LR +last8LR +last9LR +last10LR +last11LR)/11;
 }
 
-
 int averageLastUD(int incoming){
   if(last10UD == 0){last10UD = incoming;}
   if(last9UD == 0){last9UD = incoming;}
@@ -401,9 +327,6 @@ int averageLastUD(int incoming){
 
   return (last6UD +last5UD +last4UD +last3UD +last2UD + last1UD +last7UD +last8UD +last9UD +last10UD +last11UD)/11;
 }
-
-
-
 
 void flash_leds(int times, int flash_delay){
   int index = 0;
