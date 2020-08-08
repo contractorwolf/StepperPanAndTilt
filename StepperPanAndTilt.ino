@@ -103,7 +103,7 @@ void setup() {
 void loop() {
   buttonStatus = digitalRead(BTNPIN);
 
-  if(buttonStatus){
+  if(!buttonStatus){
     Serial.println("button pressed");
     calibrated = false;
     calibrated = calibrate();
